@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Github Trending</title>
+
+    <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+</head>
+<body>
+<div class="container" role="main">
+    <div class="jumbotron">
+        <h1>Github Trending</h1>
+
+        <p>Top 10 Github Repositories</p>
+    </div>
+    <div class="page-header">
+        <div class="row">
+         	<div class="dropdown">
+ 			 <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Time Period
+  			 <span class="caret"></span></button>
+ 			 <ul class="dropdown-menu">
+    			<li><a id="one_day" href="#">One Day</a></li>
+    			<li><a id="one_week" href="#">One Week</a></li>
+    			<li><a id="one_month" href="#">One Month</a></li>
+    			<li><a id="one_year" href="#">One Year</a></li>
+  				</ul>
+			</div> 
+            <div class="col-md-12">
+                <table class="table table-striped">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Language</th>
+                        <th>Description</th>
+                        <th>Stars</th>
+                        <th>Forks</th>
+
+                    </tr>
+                    </thead>
+                    <tbody id="content">
+                    <!-- filled using Ajax -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    $(function () {
+        load();
+        //initModal();
+    });
+    
+    $(".dropdown-menu li a").click(function(){
+  		$(this).parents(".dropdown").find('.btn').html($(this).text() + ' <span class="caret"></span>');
+  		$(this).parents(".dropdown").find('.btn').val($(this).data('value'));
+	});
+
+    function load() {
+        $("#content").children().remove();
+        $.getJSON("/api/repos", function (data) {
+            $.each(data, function (key, val) {
+                $("<tr><td>" + val.id + "</td><td>" + val.name + "</td><td><a  href="+ val.url +">" + val.url + "</a></td><td>" + val.language + "</td><td>" + val.description + "</td><td>" + val.stars + "</td><td>" + val.forks + "</td>" +
+                        "</tr>").appendTo("#content");
+            });
+            initCallbacks();
+        });
+    }
+
+    function initCallbacks() {
+        $(".product-delete").unbind().click(function() {
+           var id = $(this).data("id");
+           remove(id);
+        });
+    }
+    
+    $('#one_day').click(function(e) {
+        $.ajax({
+            method: "GET",
+            url: "/api/refresh/one_day"
+        }).done(function () {
+            load();
+        });
+       e.preventDefault();// prevent the default anchor functionality
+    });
+    
+    $('#one_week').click(function(e) {
+        $.ajax({
+            method: "GET",
+            url: "/api/refresh/one_week"
+        }).done(function () {
+            load();
+        });
+       e.preventDefault();// prevent the default anchor functionality
+    });
+    
+    $('#one_month').click(function(e) {
+        $.ajax({
+            method: "GET",
+            url: "/api/refresh/one_month"
+        }).done(function () {
+            load();
+        });
+       e.preventDefault();// prevent the default anchor functionality
+    });
+    
+    $('#one_year').click(function(e) {
+        $.ajax({
+            method: "GET",
+            url: "/api/refresh/one_year"
+        }).done(function () {
+            load();
+        });
+       e.preventDefault();// prevent the default anchor functionality
+    });
+
+    
+</script>
+</body>
+</html>
