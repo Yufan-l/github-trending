@@ -5,7 +5,7 @@ A simple Vert.x application to show top github repos by their fork numbers.
 
 ## Build
 
-### Build without docker
+### Build with maven
 
 You can build the project using maven:
 
@@ -20,7 +20,7 @@ You can build the project using docker:
 docker build . -t github-trending
 ```
 ## Run
-### run without docker
+### run with jar
 Once built, just launch the _fat jar_ as follows:
 
 ```
