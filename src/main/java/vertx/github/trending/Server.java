@@ -4,26 +4,14 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpServerResponse;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
-import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.StaticHandler;
 
-import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.http.client.ClientProtocolException;
-
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import api.OpenApiRoutePublisher;
+import io.swagger.v3.oas.models.OpenAPI;
 
 /**
  * 
@@ -32,15 +20,15 @@ import com.google.common.cache.LoadingCache;
  */
 public class Server extends AbstractVerticle {
 
-	private Map<Integer, Repo> repos = new LinkedHashMap<>();
 	private static final Logger logger = LoggerFactory.getLogger(Server.class);
-
-	LoadingCache<String, Map<Integer, Repo>> cache;
+	public static final String APPLICATION_JSON = "application/json";
+	Services services;
 
 	@Override
 	public void start(Future<Void> fut) {
 		int cachedExpire = config().getInteger("cache.expire", 600);
-		initialize(cachedExpire);
+		services = new Services();
+		services.initialize(cachedExpire);
 
 		// Create a router object.
 		Router router = Router.router(vertx);
@@ -53,8 +41,21 @@ public class Server extends AbstractVerticle {
 
 		router.route("/assets/*").handler(StaticHandler.create("assets"));
 
-		router.get("/api/repos").handler(this::getAll);
-		router.get("/api/refresh/:timePeriod").handler(this::refresh);
+		router.get("/api/repos").handler(services::getAll);
+		router.get("/api/refresh/:timePeriod").handler(services::refresh);
+
+		OpenAPI openAPIDoc = OpenApiRoutePublisher.publishOpenApiSpec(router, "spec", "Vertx Swagger Auto Generation",
+				"1.0.0", "http://localhost:" + config().getInteger("http.port", 8080) + "/");
+		openAPIDoc.addTagsItem(new io.swagger.v3.oas.models.tags.Tag().name("Repo").description("Repo operations"));
+
+		router.get("/swagger").handler(res -> {
+			res.response().setStatusCode(200).end(io.swagger.v3.core.util.Json.pretty(openAPIDoc));
+		});
+
+		// Serve the Swagger UI out on /doc/index.html
+		router.route("/doc/*").handler(
+				StaticHandler.create().setCachingEnabled(false).setWebRoot("api/webroot/node_modules/swagger-ui-dist"));
+
 		// Create the HTTP server and pass the "accept" method to the request
 		// handler.
 		vertx.createHttpServer().requestHandler(router::accept).listen(
@@ -69,60 +70,6 @@ public class Server extends AbstractVerticle {
 				});
 		logger.info("Server started on port: " + config().getInteger("http.port", 8080));
 		logger.info("Cache result for: " + cachedExpire + " seconds");
-	}
-
-	private void refresh(RoutingContext routingContext) {
-		String timePeriod = routingContext.request().getParam("timePeriod");
-		//String language = routingContext.request().getParam("language");
-
-		try {
-			repos = cache.get(timePeriod);
-			routingContext.response().setStatusCode(200).end();
-			logger.info("Refresh service succeed, return " + repos.size() + " results");
-		} catch (ExecutionException e) {
-			routingContext.response().setStatusCode(500).end();
-			logger.error("internal error: ", e);
-		}
-
-	}
-
-	private void getAll(RoutingContext routingContext) {
-		// Write the HTTP response
-		// The response is in JSON using the utf-8 encoding
-		routingContext.response().putHeader("content-type", "application/json; charset=utf-8")
-				.end(Json.encodePrettily(repos.values()));
-	}
-
-	private void initialize(int cachedExpire) {
-		CacheLoader<String, Map<Integer, Repo>> loader;
-		loader = new CacheLoader<String, Map<Integer, Repo>>() {
-			@Override
-			public Map<Integer, Repo> load(String key) throws ClientProtocolException, IOException {
-				return generateRepoSet(key);
-			}
-		};
-		
-		cache = CacheBuilder.newBuilder().expireAfterAccess(cachedExpire, TimeUnit.SECONDS).build(loader);
-
-		try {
-			repos = cache.get("one_year");
-			logger.info("Initialize succeed, return " + repos.size() + " results");
-			
-		} catch (ExecutionException e) {
-			logger.error("Initialize failed by internal error: ", e);
-		}
-
-	}
-
-	private Map<Integer, Repo> generateRepoSet(String key) throws ClientProtocolException, IOException {
-		List<Repo> repoList;
-		Map<Integer, Repo> repos = new LinkedHashMap<>();
-		logger.info("Calling github API");
-		repoList = GithubSearch.search(key, null);
-		for (Repo repo : repoList) {
-			repos.put(repo.getId(), repo);
-		}
-		return repos;
 	}
 
 	// For IDE debug
